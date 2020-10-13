@@ -81,7 +81,6 @@ func (c *Cache) runCleaner() {
 		defer c.wg.Done()
 
 		var (
-			ok          bool
 			removed     int
 			expiredKeys = make([]interface{}, 0, 10000)
 			oldest      = newListWithOldEntriesLRU(int(c.itemsToPrune))
@@ -95,7 +94,12 @@ func (c *Cache) runCleaner() {
 			}
 
 			if removed > 0 {
-				removed -= 1
+				removed--
+				continue
+			}
+
+			if key, ok := oldest.Next(); ok {
+				c.Del(key)
 				continue
 			}
 
@@ -106,19 +110,9 @@ func (c *Cache) runCleaner() {
 				s.GetForRemove(&expiredKeys, oldest)
 				for _, k := range expiredKeys {
 					if k != nil {
-						if ok = c.Del(k); ok {
+						if ok := c.Del(k); ok {
 							removed++
 						}
-					}
-				}
-			}
-
-			// if
-			if removed == 0 {
-				for _, k := range oldest.Keys() {
-					if k != nil {
-						c.Del(k)
-						removed++
 					}
 				}
 			}

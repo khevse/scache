@@ -25,6 +25,27 @@ func TestLruSetAndGet(t *testing.T) {
 
 func TestLruOldestList(t *testing.T) {
 
+	getKeys := func(src *listWithOldEntriesLRU) (keys []interface{}) {
+		keys = make([]interface{}, 0)
+		for {
+			if k, ok := src.Next(); ok {
+				keys = append(keys, k)
+			} else {
+				break
+			}
+		}
+		return
+	}
+
+	getEpochKeys := func(src *epoch) (keys []interface{}) {
+		for _, item := range src.items {
+			if item.Cost != nil {
+				keys = append(keys, item.Key)
+			}
+		}
+		return
+	}
+
 	type InData struct {
 		Key         string
 		Cost, Timer uint32
@@ -68,7 +89,7 @@ func TestLruOldestList(t *testing.T) {
 		{
 			// two epoch. old is first
 			Limit: 1,
-			Res:   []interface{}{"10"},
+			Res:   []interface{}{"10", "11"},
 			InData: []InData{
 				{Key: "10", Cost: 10, Timer: 3},
 				{Key: "11", Cost: 1, Timer: 3},
@@ -78,7 +99,7 @@ func TestLruOldestList(t *testing.T) {
 		{
 			// two epoch. old is in the middle
 			Limit: 1,
-			Res:   []interface{}{"14"},
+			Res:   []interface{}{"14", "13"},
 			InData: []InData{
 				{Key: "13", Cost: 1, Timer: 3},
 				{Key: "14", Cost: 10, Timer: 3},
@@ -88,7 +109,7 @@ func TestLruOldestList(t *testing.T) {
 		{
 			// two epoch. old is last
 			Limit: 1,
-			Res:   []interface{}{"18"},
+			Res:   []interface{}{"18", "16"},
 			InData: []InData{
 				{Key: "16", Cost: 1, Timer: 3},
 				{Key: "17", Cost: 3, Timer: 3},
@@ -98,7 +119,7 @@ func TestLruOldestList(t *testing.T) {
 		{
 			// two epoch. old is in the middle
 			Limit: 1,
-			Res:   []interface{}{"20"},
+			Res:   []interface{}{"20", "19"},
 			InData: []InData{
 				{Key: "19", Cost: 1, Timer: 3},
 				{Key: "20", Cost: 10, Timer: 3},
@@ -108,22 +129,29 @@ func TestLruOldestList(t *testing.T) {
 		{
 			// two epoch. old is in the middle
 			Limit: 3,
-			Res:   []interface{}{"23"},
+			Res:   []interface{}{"23", "24", "26", "22", "25"},
 			InData: []InData{
 				{Key: "22", Cost: 1, Timer: 3},
 				{Key: "23", Cost: 10, Timer: 3},
-				{Key: "25", Cost: 11, Timer: 3},
-				{Key: "27", Cost: 2, Timer: 3},
+				{Key: "24", Cost: 11, Timer: 3},
+				{Key: "25", Cost: 2, Timer: 3},
 				{Key: "26", Cost: 12, Timer: 3},
 			},
 		},
 	} {
 		l := newListWithOldEntriesLRU(testInfo.Limit)
 		for _, item := range testInfo.InData {
-			l.Add(item.Key, item.Cost, item.Timer)
+			cost := item.Cost
+			pCost := &cost
+			l.Add(item.Key, pCost, item.Timer)
 		}
 
-		require.Equal(t, testInfo.Res, l.keys, i)
+		require.Equalf(t,
+			testInfo.Res, getKeys(l),
+			"#%d: before max cost: %q; after max cost:  %q",
+			i,
+			getEpochKeys(l.beforeMaxCost),
+			getEpochKeys(l.afterMaxCost))
 		l.Clear()
 	}
 

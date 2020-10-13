@@ -25,6 +25,5 @@ type iShard interface {
 }
 
 type iListWithOldEntries interface {
-	Add(key interface{}, cost, timer uint32)
-	Clear()
+	Add(key interface{}, itemCost *uint32, maxCost uint32)
 }
